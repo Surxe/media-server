@@ -1,0 +1,32 @@
+# Jellyfin media server with NVIDIA hardware transcoding.
+# Config is read from .env (see .env.example). Bring up with:
+#   docker compose up -d
+services:
+  jellyfin:
+    image: ${JELLYFIN_IMAGE:-lscr.io/linuxserver/jellyfin:latest}
+    container_name: jellyfin
+    restart: unless-stopped
+
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-Etc/UTC}
+      # Expose the NVIDIA GPU to the container for transcoding.
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+
+    ports:
+      - "${HTTP_PORT:-8096}:8096"
+
+    volumes:
+      - ${CONFIG_DIR:-./config}:/config
+      - ${MEDIA_DIR:-./media}:/media
+
+    # Requires the NVIDIA Container Toolkit on the host (see bootstrap.sh).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

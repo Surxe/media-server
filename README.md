@@ -39,16 +39,28 @@ docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
 
 You should see your GPU listed *from inside the container*.
 
-## Run it
+## First-time setup
+
+Once per host, before the first launch:
 
 ```bash
 cp .env.example .env      # then edit .env for this host (PUID/PGID/TZ/paths)
 mkdir -p config media     # data dirs (gitignored), owned by your user
-docker compose up -d
 ```
 
-Open the web UI at `http://<host>:8096` (or your `HTTP_PORT`) and complete the
-setup wizard. Point libraries at the paths under `/media` inside the container.
+## Launch (3 steps)
+
+Everyday start-up:
+
+```bash
+cd /srv/dev/repos/media-server   # 1. into the repo
+docker compose up -d             # 2. start the server
+xdg-open http://localhost:8096   # 3. open the web UI
+```
+
+`docker compose up -d` is idempotent — safe to run whether or not the container
+is already up. Complete the setup wizard on first run; point libraries at the
+paths under `/media` inside the container.
 
 ### Enabling hardware transcoding
 

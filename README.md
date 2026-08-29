@@ -89,35 +89,30 @@ docker compose pull         # fetch a newer image
 docker compose down         # stop and remove the container (keeps config/)
 ```
 
-## Shutting down (this workstation) — the intended route & chain of command
+## Start & stop (this workstation) — the intended route
 
 On the primary workstation the Docker daemon is **disabled at boot** and runs only
-while Jellyfin is up, so nothing lingers in the background during gaming. That makes
-the shutdown route deliberate — follow it rather than just stopping the container:
+while Jellyfin is up, so nothing lingers in the background during gaming. Two paired
+desktop launchers drive it:
 
-**To shut down, use Jellyfin's own UI: Dashboard → Shut Down.** That single click
-triggers the whole teardown:
+- **Start — "Jellyfin Server" launcher** (the only start path): starts the Docker
+  daemon (`sudo systemctl start docker.service`), `docker compose up -d`, opens the UI.
+- **Stop — "Stop Jellyfin" launcher:** `docker compose down`, then
+  `sudo systemctl stop docker.service docker.socket containerd.service`. Footprint
+  back to zero.
 
-1. **Jellyfin Dashboard → Shut Down** — the Jellyfin server process exits.
-2. `restart: "no"` (in `docker-compose.yml`) means the `jellyfin` container exits and
-   **stays down** — it does not auto-restart. This is why the policy is `no` and not
-   `unless-stopped`; a restarting policy would resurrect the container and break the
-   chain below.
-3. A host-side guard (`jellyfin-daemon-guard.service`, a systemd *user* unit armed by
-   the launcher) is watching `docker events` for the container to die. It catches the
-   exit and stops the Docker daemon (`sudo systemctl stop docker.service docker.socket`).
-4. Daemon + containerd go down — footprint returns to zero until the next launch.
+> **Do NOT use Jellyfin's Dashboard → Shut Down to stop the stack.** This image runs
+> Jellyfin under s6 supervision (PID 1 in the container is s6, not Jellyfin), so an
+> in-app shutdown is immediately restarted by the supervisor and the **container never
+> exits**. Use the "Stop Jellyfin" launcher (or `docker compose down`) instead.
 
-**Starting** is the mirror image and the *only* way the daemon comes up: the "Jellyfin
-Server" desktop launcher runs `sudo systemctl start docker.service`, then
-`docker compose up -d`, arms the guard, and opens the UI.
+`restart: "no"` in `docker-compose.yml` matters here: once the Stop launcher brings
+the container down it **stays** down (no auto-restart on the next daemon start until
+the launcher runs `up -d` again).
 
-A manual `docker compose down` / `docker stop` also emits the `die` event, so it
-triggers the same daemon teardown — but the Dashboard route is the intended one.
-
-> This start/stop wiring (launcher, guard unit, the narrow `sudo` grant, and the
-> one-time `systemctl disable` of `docker.service` / `docker.socket` / `containerd`)
-> lives in the **my-system** repo — see `services/docker.md` and
+> This start/stop wiring (the two launchers, the narrow `sudo` grant, and the one-time
+> `systemctl disable` of `docker.service` / `docker.socket` / `containerd`) lives in
+> the **my-system** repo — see `services/docker.md` and
 > `users-and-permissions/sudo-policy.md` there. On a portable redeploy without that
 > wiring, use the plain [Common commands](#common-commands) above instead.
 

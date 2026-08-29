@@ -1,11 +1,17 @@
 # Jellyfin media server with NVIDIA hardware transcoding.
 # Config is read from .env (see .env.example). Bring up with:
 #   docker compose up -d
+#
+# restart: no is deliberate. The daemon is disabled at boot and only ever started
+# on demand by ethan's "Jellyfin Server" launcher; teardown is driven from Jellyfin's
+# own Dashboard -> Shut Down (the container exits and must STAY down so a host-side
+# guard can then stop the daemon). A restarting policy would resurrect the container
+# and defeat that. See my-system: services/ + users-and-permissions/sudo-policy.md.
 services:
   jellyfin:
     image: ${JELLYFIN_IMAGE:-lscr.io/linuxserver/jellyfin:latest}
     container_name: jellyfin
-    restart: unless-stopped
+    restart: "no"
 
     environment:
       - PUID=${PUID:-1000}

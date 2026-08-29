@@ -89,6 +89,38 @@ docker compose pull         # fetch a newer image
 docker compose down         # stop and remove the container (keeps config/)
 ```
 
+## Shutting down (this workstation) — the intended route & chain of command
+
+On the primary workstation the Docker daemon is **disabled at boot** and runs only
+while Jellyfin is up, so nothing lingers in the background during gaming. That makes
+the shutdown route deliberate — follow it rather than just stopping the container:
+
+**To shut down, use Jellyfin's own UI: Dashboard → Shut Down.** That single click
+triggers the whole teardown:
+
+1. **Jellyfin Dashboard → Shut Down** — the Jellyfin server process exits.
+2. `restart: "no"` (in `docker-compose.yml`) means the `jellyfin` container exits and
+   **stays down** — it does not auto-restart. This is why the policy is `no` and not
+   `unless-stopped`; a restarting policy would resurrect the container and break the
+   chain below.
+3. A host-side guard (`jellyfin-daemon-guard.service`, a systemd *user* unit armed by
+   the launcher) is watching `docker events` for the container to die. It catches the
+   exit and stops the Docker daemon (`sudo systemctl stop docker.service docker.socket`).
+4. Daemon + containerd go down — footprint returns to zero until the next launch.
+
+**Starting** is the mirror image and the *only* way the daemon comes up: the "Jellyfin
+Server" desktop launcher runs `sudo systemctl start docker.service`, then
+`docker compose up -d`, arms the guard, and opens the UI.
+
+A manual `docker compose down` / `docker stop` also emits the `die` event, so it
+triggers the same daemon teardown — but the Dashboard route is the intended one.
+
+> This start/stop wiring (launcher, guard unit, the narrow `sudo` grant, and the
+> one-time `systemctl disable` of `docker.service` / `docker.socket` / `containerd`)
+> lives in the **my-system** repo — see `services/docker.md` and
+> `users-and-permissions/sudo-policy.md` there. On a portable redeploy without that
+> wiring, use the plain [Common commands](#common-commands) above instead.
+
 ## Migrating to another host
 
 1. Install prerequisites there: `sudo ./bootstrap.sh`.
